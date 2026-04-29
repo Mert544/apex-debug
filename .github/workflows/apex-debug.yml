@@ -8,10 +8,9 @@ on:
 
 permissions:
   contents: read
-  security-events: write
 
 jobs:
-  analyze:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,15 +24,9 @@ jobs:
         run: |
           pip install -e .
 
-      # Run Apex Debug and generate SARIF
-      - name: Run Apex Debug
-        run: |
-          apex analyze . --min-severity medium --output sarif
-        continue-on-error: true
+      - name: Run tests
+        run: pytest tests/ -v
 
-      # Upload SARIF to GitHub Security tab
-      - name: Upload SARIF
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: report.sarif
+      - name: Self-scan
+        run: |
+          apex analyze . --min-severity medium --exit-code
