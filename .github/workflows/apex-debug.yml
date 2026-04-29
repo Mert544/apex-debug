@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main, master]
 
+permissions:
+  contents: read
+  security-events: write
+
 jobs:
   analyze:
     runs-on: ubuntu-latest
@@ -17,26 +21,15 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install Apex Debug
+      - name: Install dependencies
         run: |
-          pip install git+https://github.com/your-org/apex-debug.git
+          pip install -e .
 
-      # --- Option A: Fail on any CRITICAL finding ---
-      - name: Run Apex Debug (strict)
+      # Run Apex Debug and generate SARIF
+      - name: Run Apex Debug
         run: |
-          apex analyze . --min-severity critical --output sarif
+          apex analyze . --min-severity medium --output sarif
         continue-on-error: true
-
-      # --- Option B: Only check changed lines (PRs) ---
-      - name: Run Apex Debug on diff
-        if: github.event_name == 'pull_request'
-        run: |
-          apex analyze . --diff --min-severity medium
-
-      # --- Option C: Baseline mode (ignore known issues) ---
-      - name: Run Apex Debug with baseline
-        run: |
-          apex analyze . --baseline apex-baseline.json --min-severity medium
 
       # Upload SARIF to GitHub Security tab
       - name: Upload SARIF
