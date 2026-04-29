@@ -44,10 +44,10 @@ class TestRunner:
 
     def test_get_all_patterns(self):
         patterns = get_all_patterns()
-        assert len(patterns) == 27
+        assert len(patterns) == 28
         categories = get_categories()
         assert len(categories) == 4
-        assert len(categories["security"]) == 14
+        assert len(categories["security"]) == 15
         assert len(categories["correctness"]) == 4
         assert len(categories["performance"]) == 4
         assert len(categories["style"]) == 5

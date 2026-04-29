@@ -673,3 +673,76 @@ class UrllibWithoutTimeoutPattern(AbstractPattern):
             r"urllib\.request\.urlopen\s*\([^)]*\)(?!.*timeout)",
             "urlopen without timeout — specify timeout to prevent hangs",
         )
+
+
+class SensitiveDataInLogPattern(AbstractPattern):
+    name = "Sensitive data in log"
+    description = "Detects logging of passwords, tokens, secrets, or other sensitive data"
+    severity = Severity.MEDIUM
+    category = "security"
+
+    SENSITIVE_KEYWORDS = (
+        "password", "passwd", "pwd", "secret", "api_key", "apikey",
+        "token", "auth_token", "access_token", "private_key",
+        "secret_key", "credit_card", "ssn", "social_security",
+    )
+
+    LOGGING_FUNCS = {
+        "logging", "logger", "log",
+    }
+
+    def analyze_python_ast(self, node: ast.AST, source: str, filepath: str) -> list[Finding]:
+        findings = []
+        if not isinstance(node, ast.Call):
+            return findings
+
+        func_name = None
+        if isinstance(node.func, ast.Name):
+            func_name = node.func.id
+        elif isinstance(node.func, ast.Attribute):
+            func_name = node.func.attr
+
+        # Check if it's a logging call (logger.info, logging.debug, etc.)
+        is_logging = False
+        if isinstance(node.func, ast.Attribute):
+            root = node.func.value
+            while isinstance(root, ast.Attribute):
+                root = root.value
+            if isinstance(root, ast.Name) and root.id in self.LOGGING_FUNCS:
+                is_logging = True
+            if node.func.attr in ("info", "debug", "warning", "warn", "error", "critical", "log"):
+                is_logging = True
+
+        if not is_logging:
+            return findings
+
+        # Check all arguments for sensitive keywords in f-strings or .format()
+        for arg in node.args:
+            if isinstance(arg, ast.JoinedStr):
+                # f-string: check the values (not the constants)
+                for value in arg.values:
+                    if isinstance(value, ast.FormattedValue):
+                        # Check the expression inside {}
+                        expr = value.value
+                        if isinstance(expr, ast.Name):
+                            if any(kw in expr.id.lower() for kw in self.SENSITIVE_KEYWORDS):
+                                snippet = ast.get_source_segment(source, node) or ""
+                                findings.append(
+                                    self._make_finding(
+                                        filepath=filepath,
+                                        line=node.lineno,
+                                        column=node.col_offset,
+                                        message=f"Logging f-string may expose sensitive variable '{expr.id}'. Avoid logging secrets, passwords, or tokens.",
+                                        snippet=snippet,
+                                        confidence=0.75,
+                                    )
+                                )
+                                return findings
+
+        return findings
+
+    def get_regex(self) -> Optional[tuple[str, str]]:
+        return (
+            r"(?i)(?:logging|logger)\.(?:info|debug|warning|error)\s*\(.*(?:password|secret|token|api_key)",
+            "potential sensitive data in log — avoid logging secrets",
+        )

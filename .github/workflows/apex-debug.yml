@@ -32,4 +32,11 @@ jobs:
 
       - name: Self-scan
         run: |
-          python -m apex_debug.cli.app analyze . --min-severity medium
+          python -m apex_debug.cli.app analyze . --min-severity medium --output json
+
+      - name: Upload scan results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: apex-debug-scan-results
+          path: report.json

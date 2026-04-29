@@ -76,13 +76,14 @@ class ParserRegistry:
         """Check if the file extension is recognized."""
         return filepath.suffix.lower() in LANGUAGE_EXTENSIONS
 
-    def discover_files(self, target: Path) -> list[Path]:
+    def discover_files(self, target: Path, exclude: Optional[set[str]] = None) -> list[Path]:
         """Recursively discover source files in a directory.
 
         Skips hidden directories (starting with .) and common non-source dirs.
 
         Args:
             target: File or directory to scan
+            exclude: Additional directory/file name fragments to skip
 
         Returns:
             List of source file paths
@@ -97,10 +98,12 @@ class ParserRegistry:
             ".tox", ".mypy_cache", ".pytest_cache", ".ruff_cache",
             "target", ".next", ".turbo",
         }
+        if exclude:
+            skip_dirs.update(exclude)
 
         for path in target.rglob("*"):
             if path.is_file() and self.is_supported(path):
-                # Skip hidden dirs
+                # Skip hidden dirs and user-specified excludes
                 parts = set(path.parts)
                 if skip_dirs.isdisjoint(parts):
                     source_files.append(path)

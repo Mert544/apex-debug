@@ -160,6 +160,7 @@ def analyze(
     fix_dry_run: bool = typer.Option(False, "--fix-dry-run", help="Show auto-fix suggestions without applying"),
     fix: bool = typer.Option(False, "--fix", help="Apply safe auto-fixes to source files"),
     exit_code: bool = typer.Option(False, "--exit-code", help="Exit with non-zero code if findings >= --min-severity"),
+    exclude: Optional[str] = typer.Option(None, "--exclude", help="Comma-separated list of dir/file patterns to exclude"),
 ) -> None:
     """Run static analysis on a file or directory."""
     target = Path(path)
@@ -180,7 +181,8 @@ def analyze(
 
     _print_header(session)
 
-    files = parser.discover_files(target)
+    exclude_set = set(x.strip() for x in exclude.split(",")) if exclude else None
+    files = parser.discover_files(target, exclude=exclude_set)
     console.print(f"Analyzing {len(files)} file(s)...")
 
     python_files = []

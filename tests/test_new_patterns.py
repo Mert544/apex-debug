@@ -15,6 +15,7 @@ from apex_debug.engine.patterns.security import (
     HardcodedSecretPattern,
     InsecureRandomPattern,
     PathTraversalPattern,
+    SensitiveDataInLogPattern,
     SQLInjectionPattern,
     UnsafeYAMLLoadPattern,
     UrllibWithoutTimeoutPattern,
@@ -383,6 +384,53 @@ class TestUrllibWithoutTimeoutPattern:
         """urlopen with timeout should not be flagged."""
         pattern = UrllibWithoutTimeoutPattern()
         source = 'import urllib.request\nresp = urllib.request.urlopen(url, timeout=5)\n'
+        tree = ast.parse(source)
+        findings = []
+        for node in ast.walk(tree):
+            findings.extend(pattern.analyze_python_ast(node, source, "test.py"))
+        assert len(findings) == 0
+
+
+class TestSensitiveDataInLogPattern:
+    """Test sensitive data in log detection."""
+
+    def test_fstring_password_logged(self):
+        """Detect f-string logging password."""
+        pattern = SensitiveDataInLogPattern()
+        source = 'import logging\nlogging.info(f"User password: {password}")\n'
+        tree = ast.parse(source)
+        findings = []
+        for node in ast.walk(tree):
+            findings.extend(pattern.analyze_python_ast(node, source, "test.py"))
+        assert len(findings) == 1
+        assert "password" in findings[0].message.lower()
+        assert findings[0].severity == Severity.MEDIUM
+
+    def test_fstring_token_logged(self):
+        """Detect f-string logging token."""
+        pattern = SensitiveDataInLogPattern()
+        source = 'logger.debug(f"Auth token: {auth_token}")\n'
+        tree = ast.parse(source)
+        findings = []
+        for node in ast.walk(tree):
+            findings.extend(pattern.analyze_python_ast(node, source, "test.py"))
+        assert len(findings) == 1
+        assert "token" in findings[0].message.lower()
+
+    def test_safe_literal_log_not_flagged(self):
+        """Literal string without sensitive vars should not be flagged."""
+        pattern = SensitiveDataInLogPattern()
+        source = 'logging.info("User logged in successfully")\n'
+        tree = ast.parse(source)
+        findings = []
+        for node in ast.walk(tree):
+            findings.extend(pattern.analyze_python_ast(node, source, "test.py"))
+        assert len(findings) == 0
+
+    def test_non_logging_call_not_flagged(self):
+        """Non-logging calls should not be flagged."""
+        pattern = SensitiveDataInLogPattern()
+        source = 'print(f"Password: {password}")\n'
         tree = ast.parse(source)
         findings = []
         for node in ast.walk(tree):

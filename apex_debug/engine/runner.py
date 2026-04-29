@@ -43,6 +43,7 @@ def get_all_patterns(plugin_dir: Optional[str] = None) -> list[AbstractPattern]:
         PathTraversalPattern,
         PicklePattern,
         SQLInjectionPattern,
+        SensitiveDataInLogPattern,
         UnsafeYAMLLoadPattern,
         UrllibWithoutTimeoutPattern,
         WeakHashPattern,
@@ -70,6 +71,7 @@ def get_all_patterns(plugin_dir: Optional[str] = None) -> list[AbstractPattern]:
         UnsafeYAMLLoadPattern(),
         AssertStatementPattern(),
         UrllibWithoutTimeoutPattern(),
+        SensitiveDataInLogPattern(),
         BareExceptPattern(),
         NoneComparisonPattern(),
         TypeComparisonPattern(),
@@ -140,26 +142,46 @@ def run_pattern_engine(session: DebugSession, filepath: Path, source: str) -> li
     """
     findings: list[Finding] = []
 
-    enabled_categories = {
-        "security": session.config.patterns_security,
-        "correctness": session.config.patterns_correctness,
-        "performance": session.config.patterns_performance,
-        "style": session.config.patterns_style,
-    }
+    # Cache patterns per session to avoid repeated instantiation
+    if not hasattr(session, "_cached_patterns"):
+        enabled_categories = {
+            "security": session.config.patterns_security,
+            "correctness": session.config.patterns_correctness,
+            "performance": session.config.patterns_performance,
+            "style": session.config.patterns_style,
+        }
+        session._cached_patterns = [
+            p
+            for p in get_all_patterns(plugin_dir=session.config.plugin_dir)
+            if enabled_categories.get(p.category, False)
+        ]
 
-    patterns = [
-        p
-        for p in get_all_patterns(plugin_dir=session.config.plugin_dir)
-        if enabled_categories.get(p.category, False)
-    ]
+    patterns = session._cached_patterns
+    min_sev = _severity_from_str(session.config.min_severity)
+
+    # Parse AST once per file, not once per pattern
+    try:
+        import ast as ast_module
+        tree = ast_module.parse(source)
+    except SyntaxError:
+        # Fallback to regex for all patterns
+        for pattern in patterns:
+            try:
+                result = _fallback_regex_analyze(pattern, source, str(filepath))
+                for f in result:
+                    if f.severity >= min_sev:
+                        findings.append(f)
+                        session.add_finding(f)
+            except Exception:
+                continue
+        return findings
 
     for pattern in patterns:
         try:
-            result = _analyze_with_python_ast(pattern, source, str(filepath))
+            result = _analyze_with_python_ast(pattern, tree, source, str(filepath))
         except Exception:
             continue
 
-        min_sev = _severity_from_str(session.config.min_severity)
         for f in result:
             if f.severity >= min_sev:
                 findings.append(f)
@@ -169,18 +191,12 @@ def run_pattern_engine(session: DebugSession, filepath: Path, source: str) -> li
 
 
 def _analyze_with_python_ast(
-    pattern: AbstractPattern, source: str, filepath: str
+    pattern: AbstractPattern, tree: ast.AST, source: str, filepath: str
 ) -> list[Finding]:
-    """Analyze Python source using the stdlib ast module."""
+    """Analyze Python source using a pre-parsed AST."""
     import ast as ast_module
 
     findings: list[Finding] = []
-    try:
-        tree = ast_module.parse(source)
-    except SyntaxError:
-        # Try parsing without __future__ imports and decorators
-        return _fallback_regex_analyze(pattern, source, filepath)
-
     for node in ast_module.walk(tree):
         try:
             result = pattern.analyze_python_ast(node, source, filepath)
