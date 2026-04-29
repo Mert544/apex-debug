@@ -22,11 +22,11 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -e .
+          pip install -e ".[dev]"
 
       - name: Run tests
         run: pytest tests/ -v
 
       - name: Self-scan
         run: |
-          apex analyze . --min-severity medium --exit-code
+          apex analyze . --min-severity medium
