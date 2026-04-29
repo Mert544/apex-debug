@@ -34,6 +34,7 @@ class SessionConfig(BaseModel):
 
     auto_detect_language: bool = True
     default_language: str = "python"
+    plugin_dir: Optional[str] = None
 
 
 class DebugSession(BaseModel):

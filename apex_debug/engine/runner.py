@@ -11,10 +11,13 @@ from apex_debug.core.session import DebugSession
 from apex_debug.engine.patterns.base import AbstractPattern
 
 
-def get_all_patterns() -> list[AbstractPattern]:
+def get_all_patterns(plugin_dir: Optional[str] = None) -> list[AbstractPattern]:
     """Return all available pattern instances.
 
     Add new patterns here as they are implemented.
+
+    Args:
+        plugin_dir: Optional directory to load custom pattern plugins from
     """
     from apex_debug.engine.patterns.correctness import (
         BareExceptPattern,
@@ -49,7 +52,7 @@ def get_all_patterns() -> list[AbstractPattern]:
         UnusedFunctionPattern,
     )
 
-    return [
+    patterns: list[AbstractPattern] = [
         EvalExecPattern(),
         DangerousSubprocessPattern(),
         PicklePattern(),
@@ -75,6 +78,15 @@ def get_all_patterns() -> list[AbstractPattern]:
         DeadCodePattern(),
         UnusedFunctionPattern(),
     ]
+
+    # Load custom plugins if directory provided
+    if plugin_dir:
+        from apex_debug.engine.plugins import PluginLoader
+        loader = PluginLoader()
+        custom = loader.load_from_directory(plugin_dir)
+        patterns.extend(custom)
+
+    return patterns
 
 
 def run_pattern_engine_parallel(
@@ -131,7 +143,7 @@ def run_pattern_engine(session: DebugSession, filepath: Path, source: str) -> li
 
     patterns = [
         p
-        for p in get_all_patterns()
+        for p in get_all_patterns(plugin_dir=session.config.plugin_dir)
         if enabled_categories.get(p.category, False)
     ]
 

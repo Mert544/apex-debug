@@ -1,0 +1,46 @@
+name: Apex Debug
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Apex Debug
+        run: |
+          pip install git+https://github.com/your-org/apex-debug.git
+
+      # --- Option A: Fail on any CRITICAL finding ---
+      - name: Run Apex Debug (strict)
+        run: |
+          apex analyze . --min-severity critical --output sarif
+        continue-on-error: true
+
+      # --- Option B: Only check changed lines (PRs) ---
+      - name: Run Apex Debug on diff
+        if: github.event_name == 'pull_request'
+        run: |
+          apex analyze . --diff --min-severity medium
+
+      # --- Option C: Baseline mode (ignore known issues) ---
+      - name: Run Apex Debug with baseline
+        run: |
+          apex analyze . --baseline apex-baseline.json --min-severity medium
+
+      # Upload SARIF to GitHub Security tab
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: report.sarif

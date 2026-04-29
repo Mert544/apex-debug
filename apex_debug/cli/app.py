@@ -134,6 +134,10 @@ def _save_report(session: DebugSession, output: str, target: str) -> str:
         from apex_debug.reporter.json_reporter import save_json
         out = f"{base}.json"
         save_json(session.findings, out)
+    elif output == "html":
+        from apex_debug.reporter.html_reporter import save_html
+        out = f"{base}.html"
+        save_html(session.findings, out)
     else:
         console.print(f"[red]Unknown output format: {output}[/]")
         raise typer.Exit(1)
@@ -146,7 +150,8 @@ def analyze(
     path: str = typer.Argument(..., help="File or directory to analyze"),
     severity: str = typer.Option("low", "--min-severity", help="Minimum severity: info, low, medium, high, critical"),
     category: Optional[str] = typer.Option(None, "--category", help="Filter by category: security, correctness, performance, style"),
-    output: Optional[str] = typer.Option(None, "--output", help="Export report: markdown, sarif, json"),
+    output: Optional[str] = typer.Option(None, "--output", help="Export report: markdown, sarif, json, html"),
+    plugins: Optional[str] = typer.Option(None, "--plugins", help="Custom plugin directory for additional patterns"),
     no_kb: bool = typer.Option(False, "--no-kb", help="Skip knowledge base recording"),
     baseline: Optional[str] = typer.Option(None, "--baseline", help="Filter out known issues from baseline file"),
     save_baseline: Optional[str] = typer.Option(None, "--save-baseline", help="Save current findings as baseline"),
@@ -167,6 +172,8 @@ def analyze(
     if category:
         for cat in ("security", "correctness", "performance", "style"):
             setattr(config, f"patterns_{cat}", cat == category)
+    if plugins:
+        config.plugin_dir = plugins
 
     session = DebugSession(config=config)
     parser = ParserRegistry()
