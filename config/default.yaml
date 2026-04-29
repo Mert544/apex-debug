@@ -1,0 +1,23 @@
+# Apex Debug Configuration
+# Copy to .apex-debug.yaml in your project root to customize
+
+patterns:
+  security: true
+  correctness: true
+  performance: true
+  style: true
+
+severity:
+  min_report: low
+
+knowledge_base:
+  enabled: true
+  path: .apex-debug/knowledge.db
+
+parser:
+  auto_detect: true
+  default_language: python
+
+report:
+  format: terminal
+  show_context_lines: 3

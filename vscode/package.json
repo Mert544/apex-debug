@@ -1,0 +1,109 @@
+{
+  "name": "apex-debug",
+  "displayName": "Apex Debug",
+  "description": "AST-first debugging for VS Code — static analysis, interactive shell, and bug detection",
+  "version": "0.1.0",
+  "publisher": "apex",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Debuggers",
+    "Machine Learning",
+    "Testing"
+  ],
+  "activationEvents": [
+    "onLanguage:python",
+    "onCommand:apex.analyzeFile",
+    "onCommand:apex.analyzeWorkspace",
+    "onCommand:apex.openShell",
+    "onView:apexFindings"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "apex.analyzeFile",
+        "title": "Apex: Analyze Current File",
+        "icon": "$(bug)"
+      },
+      {
+        "command": "apex.analyzeWorkspace",
+        "title": "Apex: Analyze Workspace"
+      },
+      {
+        "command": "apex.openShell",
+        "title": "Apex: Open Debug Shell",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "apex.showFindings",
+        "title": "Apex: Show Findings Panel"
+      },
+      {
+        "command": "apex.goToFinding",
+        "title": "Apex: Go to Finding"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "apex.analyzeFile",
+          "group": "navigation",
+          "when": "editorLangId == python"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "apex.analyzeFile",
+          "group": "2_workspace@5",
+          "when": "resourceExtname == .py"
+        }
+      ]
+    },
+    "views": {
+      "explorer": [
+        {
+          "id": "apexFindings",
+          "name": "Apex Findings",
+          "when": "apex.hasFindings"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Apex Debug",
+      "properties": {
+        "apex.pythonPath": {
+          "type": "string",
+          "default": "python",
+          "description": "Path to Python executable"
+        },
+        "apex.minSeverity": {
+          "type": "string",
+          "default": "low",
+          "enum": ["info", "low", "medium", "high", "critical"],
+          "description": "Minimum severity to report"
+        },
+        "apex.categories": {
+          "type": "array",
+          "default": ["security", "correctness", "performance", "style"],
+          "items": {
+            "type": "string",
+            "enum": ["security", "correctness", "performance", "style"]
+          },
+          "description": "Enabled pattern categories"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/node": "18.x",
+    "typescript": "^5.0.0"
+  }
+}

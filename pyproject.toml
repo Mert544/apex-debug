@@ -1,0 +1,36 @@
+[project]
+name = "apex-debug"
+version = "0.1.0"
+description = "Apex Debug Agent — AST-first, AI-augmented debugging tool"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "Apex" }]
+dependencies = [
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    "typer>=0.9",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+tree-sitter = ["tree-sitter>=0.23"]
+ai = ["openai>=1.0", "jinja2>=3.0"]
+interactive = ["prompt-toolkit>=3.0"]
+all = ["apex-debug[tree-sitter,ai,interactive]"]
+dev = ["apex-debug[all]", "pytest>=8.0", "ruff>=0.5"]
+
+[project.scripts]
+apex-debug = "apex_debug.cli.app:app"
+
+[tool.setuptools.packages.find]
+include = ["apex_debug*"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
