@@ -212,7 +212,7 @@ def _has_prompt_toolkit() -> bool:
 def run_interactive_shell() -> None:
     """Start the interactive debug shell."""
     shell = DebugShell()
-    print("Apex Debug Shell v0.1.0")
+    print("Apex Debug Shell v0.2.0")
     print("Type 'help' for commands, 'quit' to exit.")
     print()
 

@@ -8,6 +8,7 @@ import pytest
 
 from apex_debug.core.finding import Severity
 from apex_debug.engine.patterns.security import (
+    AssertStatementPattern,
     CORSWildcardPattern,
     DebugTruePattern,
     HardcodedIPPattern,
@@ -15,6 +16,8 @@ from apex_debug.engine.patterns.security import (
     InsecureRandomPattern,
     PathTraversalPattern,
     SQLInjectionPattern,
+    UnsafeYAMLLoadPattern,
+    UrllibWithoutTimeoutPattern,
     WeakHashPattern,
 )
 from apex_debug.engine.patterns.correctness import TypeComparisonPattern
@@ -292,6 +295,94 @@ class TestCORSWildcardPattern:
         """Specific origins should not be flagged."""
         pattern = CORSWildcardPattern()
         source = 'CORS_ORIGINS = ["https://example.com"]\n'
+        tree = ast.parse(source)
+        findings = []
+        for node in ast.walk(tree):
+            findings.extend(pattern.analyze_python_ast(node, source, "test.py"))
+        assert len(findings) == 0
+
+
+class TestUnsafeYAMLLoadPattern:
+    """Test unsafe YAML load detection."""
+
+    def test_yaml_load_without_loader(self):
+        """Detect yaml.load() without Loader."""
+        pattern = UnsafeYAMLLoadPattern()
+        source = 'import yaml\ndata = yaml.load(stream)\n'
+        tree = ast.parse(source)
+        findings = []
+        for node in ast.walk(tree):
+            findings.extend(pattern.analyze_python_ast(node, source, "test.py"))
+        assert len(findings) == 1
+        assert "safe_load" in findings[0].message.lower()
+        assert findings[0].severity == Severity.HIGH
+
+    def test_yaml_load_with_loader_safe(self):
+        """yaml.load() with Loader should not be flagged."""
+        pattern = UnsafeYAMLLoadPattern()
+        source = 'import yaml\ndata = yaml.load(stream, Loader=yaml.SafeLoader)\n'
+        tree = ast.parse(source)
+        findings = []
+        for node in ast.walk(tree):
+            findings.extend(pattern.analyze_python_ast(node, source, "test.py"))
+        assert len(findings) == 0
+
+    def test_yaml_safe_load_not_flagged(self):
+        """yaml.safe_load() should not be flagged."""
+        pattern = UnsafeYAMLLoadPattern()
+        source = 'import yaml\ndata = yaml.safe_load(stream)\n'
+        tree = ast.parse(source)
+        findings = []
+        for node in ast.walk(tree):
+            findings.extend(pattern.analyze_python_ast(node, source, "test.py"))
+        assert len(findings) == 0
+
+
+class TestAssertStatementPattern:
+    """Test assert statement detection."""
+
+    def test_assert_detected(self):
+        """Detect assert statement."""
+        pattern = AssertStatementPattern()
+        source = 'assert x > 0, "must be positive"\n'
+        tree = ast.parse(source)
+        findings = []
+        for node in ast.walk(tree):
+            findings.extend(pattern.analyze_python_ast(node, source, "test.py"))
+        assert len(findings) == 1
+        assert "-O" in findings[0].message
+        assert findings[0].severity == Severity.LOW
+
+    def test_no_assert_not_flagged(self):
+        """Code without assert should not be flagged."""
+        pattern = AssertStatementPattern()
+        source = 'x = 1\n'
+        tree = ast.parse(source)
+        findings = []
+        for node in ast.walk(tree):
+            findings.extend(pattern.analyze_python_ast(node, source, "test.py"))
+        assert len(findings) == 0
+
+
+class TestUrllibWithoutTimeoutPattern:
+    """Test urlopen without timeout detection."""
+
+    def test_urlopen_without_timeout(self):
+        """Detect urllib.request.urlopen() without timeout."""
+        pattern = UrllibWithoutTimeoutPattern()
+        source = 'import urllib.request\nresp = urllib.request.urlopen(url)\n'
+        tree = ast.parse(source)
+        findings = []
+        for node in ast.walk(tree):
+            findings.extend(pattern.analyze_python_ast(node, source, "test.py"))
+        assert len(findings) == 1
+        assert "timeout" in findings[0].message.lower()
+        assert findings[0].severity == Severity.MEDIUM
+
+    def test_urlopen_with_timeout_safe(self):
+        """urlopen with timeout should not be flagged."""
+        pattern = UrllibWithoutTimeoutPattern()
+        source = 'import urllib.request\nresp = urllib.request.urlopen(url, timeout=5)\n'
         tree = ast.parse(source)
         findings = []
         for node in ast.walk(tree):

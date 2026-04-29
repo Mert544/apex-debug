@@ -644,8 +644,12 @@ class UrllibWithoutTimeoutPattern(AbstractPattern):
         if not isinstance(node, ast.Call):
             return findings
 
-        if isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name):
-            if node.func.value.id == "urllib" and node.func.attr == "urlopen":
+        if isinstance(node.func, ast.Attribute) and node.func.attr == "urlopen":
+            # Walk up attribute chain to find root module (e.g. urllib.request -> urllib)
+            root = node.func.value
+            while isinstance(root, ast.Attribute):
+                root = root.value
+            if isinstance(root, ast.Name) and root.id == "urllib":
                 has_timeout = any(
                     kw.arg == "timeout" for kw in node.keywords
                 )

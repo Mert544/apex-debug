@@ -2,7 +2,8 @@
 
 **AST-first static analysis for Python, JavaScript, TypeScript, Go, Rust, and more.**
 
-[![Tests](https://img.shields.io/badge/tests-73%2F73-brightgreen)](tests/)
+[![CI](https://github.com/Mert544/apex-debug/actions/workflows/apex-debug.yml/badge.svg)](https://github.com/Mert544/apex-debug/actions)
+[![Tests](https://img.shields.io/badge/tests-80%2F80-brightgreen)](tests/)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](pyproject.toml)
 [![License](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
 

@@ -54,6 +54,19 @@ def generate_sarif(findings: list[Finding], tool_name: str = "ApexDebug") -> dic
             }
         )
 
+    # Build unique rules to avoid duplicates
+    rule_map: dict[str, dict] = {}
+    for f in findings:
+        if f.id not in rule_map:
+            rule_map[f.id] = {
+                "id": f.id,
+                "name": f.title,
+                "shortDescription": {"text": f.title},
+                "defaultConfiguration": {
+                    "level": "error" if f.severity.value >= 3 else "warning"
+                },
+            }
+
     return {
         "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
         "version": "2.1.0",
@@ -62,18 +75,8 @@ def generate_sarif(findings: list[Finding], tool_name: str = "ApexDebug") -> dic
                 "tool": {
                     "driver": {
                         "name": tool_name,
-                        "informationUri": "https://apex.debug",
-                        "rules": [
-                            {
-                                "id": f.id,
-                                "name": f.title,
-                                "shortDescription": {"text": f.description if hasattr(f, "description") else f.title},
-                                "defaultConfiguration": {
-                                    "level": "error" if f.severity.value >= 3 else "warning"
-                                },
-                            }
-                            for f in findings
-                        ],
+                        "informationUri": "https://github.com/Mert544/apex-debug",
+                        "rules": list(rule_map.values()),
                     }
                 },
                 "results": results,

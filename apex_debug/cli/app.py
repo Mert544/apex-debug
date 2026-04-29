@@ -71,7 +71,7 @@ def _print_header(session: DebugSession) -> None:
     console.print()
     console.print(
         Panel.fit(
-            f"[bold]Apex Debug[/] v0.1.0 — Session {session.id}",
+            f"[bold]Apex Debug[/] v0.2.0 — Session {session.id}",
             subtitle=f"Target: {session.config.target}",
         )
     )
