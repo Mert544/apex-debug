@@ -11,6 +11,7 @@ A pattern is a self-contained detector for one category of bug.
 from __future__ import annotations
 
 import ast
+import re
 from abc import ABC, abstractmethod
 from typing import ClassVar, Optional
 
@@ -33,9 +34,31 @@ class AbstractPattern(ABC):
     category: ClassVar[str]
 
     _counter: ClassVar[int] = 0
+    _regex_cache: ClassVar[dict[str, re.Pattern]] = {}
 
     def __init__(self) -> None:
         self._match_index = 0
+        self._compiled_regex: Optional[re.Pattern] = None
+        self._regex_message: Optional[str] = None
+
+    def _get_compiled_regex(self) -> Optional[tuple[re.Pattern, str]]:
+        """Return compiled regex + message template, cached per class."""
+        if self._compiled_regex is not None:
+            return self._compiled_regex, self._regex_message or ""
+
+        regex_info = self.get_regex()
+        if regex_info is None:
+            return None
+
+        pattern_str, message = regex_info
+        compiled = AbstractPattern._regex_cache.get(pattern_str)
+        if compiled is None:
+            compiled = re.compile(pattern_str)
+            AbstractPattern._regex_cache[pattern_str] = compiled
+
+        self._compiled_regex = compiled
+        self._regex_message = message
+        return compiled, message
 
     # -- AST-based detection (Python, always available) --
 

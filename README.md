@@ -2,7 +2,7 @@
 
 **AST-first static analysis for Python, JavaScript, TypeScript, Go, Rust, and more.**
 
-[![Tests](https://img.shields.io/badge/tests-27%2F27-brightgreen)](tests/)
+[![Tests](https://img.shields.io/badge/tests-73%2F73-brightgreen)](tests/)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](pyproject.toml)
 [![License](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
 
@@ -16,14 +16,18 @@ Apex Debug is a lightweight, extensible static analysis tool that detects securi
 
 | Feature | Description |
 |---------|-------------|
-| **15 Detection Patterns** | Security, correctness, performance, style |
+| **27 Detection Patterns** | Security, correctness, performance, style |
 | **Multi-Language** | Python (AST), JS/TS/Go/Rust (regex fallback), 25+ file extensions |
 | **Parallel Analysis** | Multi-threaded for large codebases |
 | **Knowledge Base** | SQLite persistence — remembers past findings |
-| **Multiple Outputs** | Terminal, Markdown, SARIF (GitHub Code Scanning), JSON |
+| **Multiple Outputs** | Terminal, Markdown, SARIF (GitHub Code Scanning), JSON, HTML |
+| **Watch Mode** | Auto-reanalyze on file changes |
+| **Baseline / Diff** | Filter known issues or analyze only changed lines |
+| **Auto-Fix** | Safe, deterministic code corrections |
+| **Custom Plugins** | Load your own detection patterns at runtime |
 | **Interactive Shell** | Breakpoint, step, run, analyze — like a debugger |
-| **VS Code Extension** | Sidebar findings panel, one-click analysis |
 | **Pre-commit Hook** | Block commits with CRITICAL/HIGH issues |
+| **Exit Codes** | CI/CD friendly — returns max severity level |
 | **Zero Dependencies** | Core works with stdlib only |
 
 ---
@@ -48,19 +52,34 @@ pip install -e .[dev]
 
 ```bash
 # Analyze a single file
-apex-debug analyze app.py
+apex analyze app.py
 
 # Analyze a directory with full severity
-apex-debug analyze src/ --min-severity info
+apex analyze src/ --min-severity info
 
 # Export as SARIF for GitHub Code Scanning
-apex-debug analyze src/ --output sarif
+apex analyze src/ --output sarif
+
+# Watch mode — auto-reanalyze on save
+apex watch src/
+
+# Use a baseline to hide known issues
+apex analyze src/ --baseline .apex-debug/baseline.json
+
+# Analyze only changed lines (staged)
+apex analyze src/ --diff-staged
+
+# Auto-fix safe issues
+apex analyze src/ --fix
+
+# Load custom pattern plugins
+apex analyze src/ --plugins ./my-patterns
 
 # Filter by category
-apex-debug analyze src/ --category security
+apex analyze src/ --category security
 
 # Interactive debug shell
-apex-debug shell
+apex shell
 ```
 
 ---
@@ -69,40 +88,56 @@ apex-debug shell
 
 | Command | Description |
 |---------|-------------|
-| `apex-debug analyze <path>` | Run static analysis |
-| `apex-debug analyze --output markdown` | Export Markdown report |
-| `apex-debug analyze --output sarif` | Export SARIF for GitHub |
-| `apex-debug analyze --output json` | Export JSON report |
-| `apex-debug shell` | Interactive debug shell |
-| `apex-debug patterns` | List all 15 detection patterns |
-| `apex-debug kb stats` | Knowledge base statistics |
-| `apex-debug info` | Show version and config |
+| `apex analyze <path>` | Run static analysis |
+| `apex watch <path>` | Watch files and re-analyze on change |
+| `apex patterns` | List all detection patterns |
+| `apex plugins list` | List custom pattern plugins |
+| `apex kb stats` | Knowledge base statistics |
+| `apex info` | Show version and config |
 
-### Interactive Shell Commands
+### Output Formats
 
-```
-(apex-debug) load app.py     # Load a file
-(apex-debug) list            # Show source
-(apex-debug) break 14        # Set breakpoint
-(apex-debug) step            # Advance line
-(apex-debug) run             # Run the file
-(apex-debug) analyze         # Static analysis
-(apex-debug) quit            # Exit
+| Flag | Description |
+|------|-------------|
+| `--output terminal` | Rich colored terminal output (default) |
+| `--output markdown` | Markdown report |
+| `--output json` | JSON report |
+| `--output html` | Interactive HTML report |
+| `--output sarif` | SARIF v2.1.0 for GitHub Code Scanning |
+
+### CI/CD Exit Codes
+
+Use `--exit-code` to return the maximum severity as exit code:
+
+```bash
+apex analyze src/ --exit-code
+# Exit 1 = INFO, 2 = LOW, 3 = MEDIUM, 4 = HIGH, 5 = CRITICAL
 ```
 
 ---
 
 ## Detection Patterns
 
-### Security (4 patterns)
+### Security (14 patterns)
 - `eval()` / `exec()` / `compile()` — arbitrary code execution
 - `os.system()` / `subprocess.run(shell=True)` — shell injection
 - `pickle.loads()` — insecure deserialization
 - SQL injection via f-string / `%` formatting
+- `hashlib.md5()` / `hashlib.sha1()` — weak cryptographic hash
+- Hardcoded passwords, API keys, secrets
+- `random.*` for security-sensitive operations
+- `open()` with non-literal paths — path traversal
+- Hardcoded IP addresses
+- `DEBUG = True` in production
+- CORS wildcard `origins="*"`
+- `yaml.load()` without `Loader` — arbitrary code execution
+- `assert` statements — removed with `python -O`
+- `urllib.request.urlopen()` without timeout
 
-### Correctness (3 patterns)
+### Correctness (4 patterns)
 - Bare `except:` clauses
 - `== None` instead of `is None`
+- `type(x) == Y` instead of `isinstance()`
 - Unused local variables
 
 ### Performance (4 patterns)
@@ -111,11 +146,12 @@ apex-debug shell
 - String concatenation in loops
 - Global variable access in loops
 
-### Style (4 patterns)
+### Style (5 patterns)
 - Missing docstrings
 - Functions over 50 lines
 - Functions with > 5 arguments
 - Unreachable code after return/raise
+- Unused functions
 
 ---
 
@@ -136,6 +172,9 @@ severity:
 knowledge_base:
   enabled: true
   path: .apex-debug/knowledge.db
+
+plugins:
+  directory: .apex-debug/plugins
 ```
 
 Hierarchy: CLI flags > `.apex-debug.yaml` > `~/.apex-debug/config.yaml` > bundled defaults
@@ -179,13 +218,13 @@ Features:
     python-version: "3.11"
 - run: pip install -e .[dev]
 - run: pytest tests/ -v
-- run: apex-debug analyze src/ --output sarif
+- run: apex analyze src/ --output sarif --exit-code
 - uses: github/codeql-action/upload-sarif@v3
   with:
     sarif_file: report.sarif
 ```
 
-Full workflow: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
+Full workflow: [`.github/workflows/apex-debug.yml`](.github/workflows/apex-debug.yml)
 
 ---
 
@@ -196,11 +235,16 @@ apex-debug/
 ├── apex_debug/
 │   ├── core/              # Finding, Session, EventBus
 │   ├── engine/
-│   │   ├── patterns/      # 15 detection plugins
+│   │   ├── patterns/      # 27 detection plugins
 │   │   ├── runner.py      # Pattern engine + parallel
-│   │   └── knowledge.py   # SQLite KB
+│   │   ├── knowledge.py   # SQLite KB
+│   │   ├── watcher.py     # File watch mode
+│   │   ├── baseline.py    # Baseline filter
+│   │   ├── autofix.py     # Safe auto-fixes
+│   │   ├── gitdiff.py     # Git diff filtering
+│   │   └── plugins.py     # Custom pattern loader
 │   ├── parsers/           # File discovery + multi-language
-│   ├── reporter/          # Markdown, SARIF, JSON
+│   ├── reporter/          # Markdown, SARIF, JSON, HTML
 │   ├── cli/
 │   │   ├── app.py         # CLI commands
 │   │   └── interactive.py # Debug shell
@@ -208,7 +252,7 @@ apex-debug/
 ├── vscode/                # VS Code extension
 ├── scripts/
 │   └── pre-commit.py      # Git hook
-├── tests/                 # 27 pytest tests
+├── tests/                 # 73 pytest tests
 └── config/default.yaml    # Default configuration
 ```
 
@@ -220,7 +264,7 @@ apex-debug/
 pytest tests/ -v
 ```
 
-27 tests covering all patterns, runner, parser, and config.
+73 tests covering all patterns, runner, parser, config, watcher, baseline, autofix, and plugins.
 
 ---
 

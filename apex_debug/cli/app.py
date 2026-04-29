@@ -338,7 +338,7 @@ def watch(
 
 @app.command()
 def patterns() -> None:
-    """List all available detection patterns."""
+    """List available detection patterns."""
     table = Table(title="Available Patterns")
     table.add_column("Name")
     table.add_column("Category")
@@ -359,6 +359,37 @@ def patterns() -> None:
     for cat, pats in cats.items():
         console.print(f"  [bold]{cat}[/]: {len(pats)} patterns")
     console.print(f"\n  [dim]{len(get_all_patterns())} patterns total[/]")
+
+
+@app.command()
+def plugins(
+    action: str = typer.Argument("list", help="Action: list, init-example"),
+    directory: str = typer.Option(".apex-debug/plugins", "--dir", help="Plugin directory"),
+) -> None:
+    """Manage custom pattern plugins."""
+    from apex_debug.engine.plugins import PluginLoader
+
+    if action == "list":
+        loader = PluginLoader()
+        custom = loader.load_from_directory(directory)
+        if custom:
+            console.print(f"[bold]Custom plugins in {directory}:[/]")
+            for p in custom:
+                sev_color = SEVERITY_COLORS.get(p.severity.value, "white")
+                console.print(
+                    f"  [{sev_color}]{p.severity.name}[/] {p.name} ({p.category})"
+                )
+        else:
+            console.print(f"[dim]No custom plugins found in {directory}[/]")
+            console.print("Run 'apex plugins init-example' to create an example plugin.")
+
+    elif action == "init-example":
+        path = PluginLoader.create_example_plugin(directory)
+        console.print(f"[green]Example plugin created: {path}[/]")
+        console.print("[dim]Edit the file and run with --plugins {directory}[/]")
+
+    else:
+        console.print(f"[red]Unknown action: {action}. Use 'list' or 'init-example'[/]")
 
 
 @app.command()

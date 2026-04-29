@@ -32,6 +32,7 @@ def get_all_patterns(plugin_dir: Optional[str] = None) -> list[AbstractPattern]:
         StringConcatInLoopPattern,
     )
     from apex_debug.engine.patterns.security import (
+        AssertStatementPattern,
         CORSWildcardPattern,
         DangerousSubprocessPattern,
         DebugTruePattern,
@@ -42,6 +43,8 @@ def get_all_patterns(plugin_dir: Optional[str] = None) -> list[AbstractPattern]:
         PathTraversalPattern,
         PicklePattern,
         SQLInjectionPattern,
+        UnsafeYAMLLoadPattern,
+        UrllibWithoutTimeoutPattern,
         WeakHashPattern,
     )
     from apex_debug.engine.patterns.style import (
@@ -64,6 +67,9 @@ def get_all_patterns(plugin_dir: Optional[str] = None) -> list[AbstractPattern]:
         HardcodedIPPattern(),
         DebugTruePattern(),
         CORSWildcardPattern(),
+        UnsafeYAMLLoadPattern(),
+        AssertStatementPattern(),
+        UrllibWithoutTimeoutPattern(),
         BareExceptPattern(),
         NoneComparisonPattern(),
         TypeComparisonPattern(),
@@ -189,18 +195,16 @@ def _fallback_regex_analyze(
     pattern: AbstractPattern, source: str, filepath: str
 ) -> list[Finding]:
     """Universal regex fallback for any file or language."""
-    import re as re_module
-
     findings: list[Finding] = []
-    regex_info = pattern.get_regex()
-    if regex_info is None:
+    compiled = pattern._get_compiled_regex()
+    if compiled is None:
         return findings
 
-    pattern_re, message_template = regex_info
+    pattern_re, message_template = compiled
     lines = source.split("\n")
 
     for line_no, line in enumerate(lines, start=1):
-        match = re_module.search(pattern_re, line)
+        match = pattern_re.search(line)
         if match:
             findings.append(
                 pattern._make_finding(

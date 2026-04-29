@@ -1,10 +1,23 @@
 [project]
 name = "apex-debug"
-version = "0.1.0"
-description = "Apex Debug Agent — AST-first, AI-augmented debugging tool"
+version = "0.2.0"
+description = "Apex Debug — AST-first static analysis with 24+ detection patterns, plugins, and AI-augmented debugging"
 requires-python = ">=3.10"
 license = "MIT"
 authors = [{ name = "Apex" }]
+readme = "README.md"
+keywords = ["static-analysis", "security", "linting", "ast", "debugging", "python"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Security",
+]
 dependencies = [
     "pydantic>=2.0",
     "pyyaml>=6.0",
@@ -21,6 +34,11 @@ dev = ["apex-debug[all]", "pytest>=8.0", "ruff>=0.5"]
 
 [project.scripts]
 apex-debug = "apex_debug.cli.app:app"
+apex = "apex_debug.cli.app:app"
+
+[project.urls]
+Repository = "https://github.com/Mert544/apex-debug"
+Issues = "https://github.com/Mert544/apex-debug/issues"
 
 [tool.setuptools.packages.find]
 include = ["apex_debug*"]

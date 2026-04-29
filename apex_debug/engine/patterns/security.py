@@ -514,7 +514,7 @@ class CORSWildcardPattern(AbstractPattern):
     category = "security"
 
     def analyze_python_ast(self, node: ast.AST, source: str, filepath: str) -> list[Finding]:
-        findings: list[Finding] = []
+        findings = []
 
         # Pattern 1: CORS_ORIGINS = ["*"] or CORS_ALLOW_ALL = True
         if isinstance(node, ast.Assign):
@@ -561,4 +561,111 @@ class CORSWildcardPattern(AbstractPattern):
         return (
             r"(?i)(?:origins|allow_origin|allowed_origin)\s*=\s*['\"]\*['\"]",
             "CORS wildcard — specify explicit origins",
+        )
+
+
+class UnsafeYAMLLoadPattern(AbstractPattern):
+    name = "Unsafe YAML load"
+    description = "Detects yaml.load() without Loader specification which can execute arbitrary code"
+    severity = Severity.HIGH
+    category = "security"
+
+    def analyze_python_ast(self, node: ast.AST, source: str, filepath: str) -> list[Finding]:
+        findings = []
+        if not isinstance(node, ast.Call):
+            return findings
+
+        if isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name):
+            if node.func.value.id == "yaml" and node.func.attr == "load":
+                # Check if Loader kwarg is provided
+                has_loader = any(
+                    kw.arg == "Loader" for kw in node.keywords
+                )
+                if not has_loader:
+                    snippet = ast.get_source_segment(source, node) or ""
+                    findings.append(
+                        self._make_finding(
+                            filepath=filepath,
+                            line=node.lineno,
+                            column=node.col_offset,
+                            message="yaml.load() without Loader is unsafe and can execute arbitrary code. Use yaml.safe_load() or yaml.load(..., Loader=yaml.SafeLoader).",
+                            snippet=snippet,
+                            confidence=0.9,
+                        )
+                    )
+
+        return findings
+
+    def get_regex(self) -> Optional[tuple[str, str]]:
+        return (
+            r"yaml\.load\s*\([^)]*\)(?!.*Loader)",
+            "unsafe yaml.load() — use yaml.safe_load() or specify Loader",
+        )
+
+
+class AssertStatementPattern(AbstractPattern):
+    name = "Assert statement in production"
+    description = "Detects assert statements that are removed when Python runs with -O (optimized)"
+    severity = Severity.LOW
+    category = "security"
+
+    def analyze_python_ast(self, node: ast.AST, source: str, filepath: str) -> list[Finding]:
+        findings = []
+        if isinstance(node, ast.Assert):
+            snippet = ast.get_source_segment(source, node) or ""
+            findings.append(
+                self._make_finding(
+                    filepath=filepath,
+                    line=node.lineno,
+                    column=node.col_offset,
+                    message="assert statements are removed when Python runs with -O. Use explicit checks and raise proper exceptions for production-critical validation.",
+                    snippet=snippet,
+                    confidence=0.8,
+                )
+            )
+
+        return findings
+
+    def get_regex(self) -> Optional[tuple[str, str]]:
+        return (
+            r"^\s*assert\s+",
+            "assert statement — removed under python -O; use explicit checks",
+        )
+
+
+class UrllibWithoutTimeoutPattern(AbstractPattern):
+    name = "Network call without timeout"
+    description = "Detects urllib.request.urlopen() calls without a timeout parameter"
+    severity = Severity.MEDIUM
+    category = "security"
+
+    def analyze_python_ast(self, node: ast.AST, source: str, filepath: str) -> list[Finding]:
+        findings = []
+        if not isinstance(node, ast.Call):
+            return findings
+
+        if isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name):
+            if node.func.value.id == "urllib" and node.func.attr == "urlopen":
+                has_timeout = any(
+                    kw.arg == "timeout" for kw in node.keywords
+                )
+                if not has_timeout:
+                    snippet = ast.get_source_segment(source, node) or ""
+                    findings.append(
+                        self._make_finding(
+                            filepath=filepath,
+                            line=node.lineno,
+                            column=node.col_offset,
+                            message="urllib.request.urlopen() without timeout can hang indefinitely. Always specify a timeout (e.g., timeout=5).",
+                            snippet=snippet,
+                            confidence=0.85,
+                        )
+                    )
+
+        return findings
+
+    def get_regex(self) -> Optional[tuple[str, str]]:
+        return (
+            r"urllib\.request\.urlopen\s*\([^)]*\)(?!.*timeout)",
+            "urlopen without timeout — specify timeout to prevent hangs",
         )
